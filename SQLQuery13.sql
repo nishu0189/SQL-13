@@ -28,8 +28,8 @@ select * from emp
 
 ------------------------update the table from another table--------------------------------------
 
---------unable to upadte by where clause so we did join 
-
+--------unable to upadate by where clause so we did join 
+-- with the help of where clause we can just filter it , we can't get the name from other table 
 update emp
 set dept_N = d.dept_name
 from emp e
@@ -97,22 +97,46 @@ where not exists( select * from dept d where e.dept_id =  d.dept_id) --outpput w
 select * from emp e
 where not exists( select 1 from dept d where e.dept_id =  d.dept_id) --outpput will be 400
 
------------------------------------------------	CHECKING TABLE IS PRESENT OR NOT ----------------------------------------------------------------
+-----------------------------------------------5.	CHECKING TABLE IS PRESENT OR NOT ----------------------------------------------------------------
 
 Create table if not exists  emp
+
+CREATE TABLE IF NOT EXISTS emp (
+    emp_id INT,
+    emp_name VARCHAR(100),
+    salary DECIMAL(10, 2)
+);
+
 
 ---------------------------------------------------------------------------------------------------------------------------------
 /*
 DDL :- data defination lang      --> create, drop , alter
 DML :- data manipulation lang    --> insert, update delete 
-DQL :- data query lang  
-DCL :- data control lang         -->  grant, revoke          (give the access to user)
+DQL :- data query lang           --> select
+DCL :- data control lang         --> grant, revoke          (give the access to user)
 TCL :- Transaction control lang  --> commit , rollback
 */
 
 -------------------------------------------DCL(data control lang )-----------------------------------------------------------------
+/* 1. guest means:
+A temporary user who does not have a proper account in the database.
+Example: Someone visits your database but doesn’t have a user ID, they can still access it using the guest account (if allowed).
+If you give guest permission to a table, anyone who doesn’t have a user account might be able to use it.
 
---------------------------------------------------------- GRANT-----------------------------------------------------------------------
+🔴 Risk: Unsafe. You should not usually give INSERT, UPDATE, or DELETE permissions to guest. Only read (SELECT) in some rare cases. */
+
+/*2. public means:
+A default role that every user in your database belongs to automatically.
+
+If you give public permission, all users will get that permission.
+
+Example: You want every user to be able to read from a table, so you write:
+GRANT SELECT ON emp TO public
+
+🟡 Be careful: Don’t give too many permissions to public, or else everyone will have too much access. */ 
+
+
+---------------------------------------------------------1. GRANT-----------------------------------------------------------------------
 --Assigning to individual 
 
 --Gives permission to SELECT (read) and INSERT (add new records) into the emp table.
@@ -133,13 +157,13 @@ grant select, insert on emp to public
 
  grant select on schema :: dbo to guest  --give permission to guest to read all the table 
 
-------------------------------------------------------- REVOKE-----------------------------------------------------------------
+-------------------------------------------------------2. REVOKE-----------------------------------------------------------------
 
-Revoke select, insert, delete on emp from guest  --Assigning to individual 
+Revoke select, insert, delete on emp from guest  -- Removing the permission from the guest users
 
 
 
----------------------------------------------------ROLE------------------------------------------------------------------------------
+---------------------------------------------------3. ROLE------------------------------------------------------------------------------
 /*
 A role in SQL Server is a way to manage permissions for multiple users efficiently. 
 Instead of granting permissions to individual users, you can create a role, assign permissions to the role,
@@ -148,42 +172,56 @@ and then add users to that role. This makes permission management easier and mor
 create role sales_man  --create ROLE
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON shop TO sales_man; -- grant the permission to the sale_man role
-
-alter role sales_man  --already a user 
+ 
+alter role sales_man  --add the user guest to sale_man role
 add member guest
 
 
---1. Before adding a user to the role, ensure that 'Amit' is already a user in the database. 
-SELECT name FROM sys.database_principals WHERE type IN ('S', 'U');
+--1.Checking Existing Users: Amit, before adding a user to the role
+SELECT name FROM sys.database_principals WHERE type IN ('S', 'U');  --'S' = SQL user 'U' = Windows user
 
 --2. If ‘Amit’ is missing, create the login:
-CREATE LOGIN Amit WITH PASSWORD = 'nishu';
+CREATE LOGIN Amit WITH PASSWORD = '123';
 
 --3. Then, create the database user:
 create user amit  for login Amit
 
 --4. Finally, add Amit to the role:
-alter role sales_man   --show error as amit doesn't exist in db
+alter role sales_man   
 add member Amit
 
----------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------4.WITH GRANT OPTION---------------------------------------------------
 
---guest can also grant SELECT permission on emp to other users.guest get power to give same access to other
+/* What is WITH GRANT OPTION?
+Normally, when you grant a permission (e.g., SELECT) to someone, they can only use it.
+But when you add WITH GRANT OPTION, you allow them to grant that same permission to others.*/
+
 grant select on emp to guest with grant option
 
 
 
 
------------------------------------------------TCL--------------------------------------------------------
+-----------------------------------------------TCL (Transaction control lang ) --------------------------------------------------------
 
 /*
-tcl is applicable to dml , ddl is auto commit
+TCL commands like ROLLBACK and COMMIT are applicable to DML only
+ ddl is auto commit
 we can rollback in ddl commands like create , alter
 
 tcl come in when dml like insert update, delete 
-*/
+*/ /*
+Q:- What does "DDL is auto-commit" mean?
+Ans:- Whenever you run a DDL command (CREATE, DROP, ALTER), it is immediately and permanently committed to the database.
+You do not need to use COMMIT.
+Also, you cannot ROLLBACK the DDL in most databases 
 
---------------------------------------------------------- ROLLBACK-----------------------------------------------------------------------
+| Command Type                       | Auto-commit? | Can ROLLBACK? | Uses COMMIT?             |
+| ---------------------------------- | ------------ | ------------- | ------------------------ |
+| DML (`INSERT`, `UPDATE`, `DELETE`) | ❌ No         | ✅ Yes         | ✅ Yes                    |
+| DDL (`CREATE`, `ALTER`, `DROP`)    | ✅ Yes        | ❌ No          | ❌ No (already committed) | */
+
+
+---------------------------------------------------------1. ROLLBACK-----------------------------------------------------------------------
 select * from emp
 
 
@@ -198,7 +236,8 @@ rollback tran a --3.Rolls back (undoes) all changes made since the BEGIN TRAN a.
 SELECT e_id, salary FROM emp WHERE e_id = 11; --#####After ROLLBACK TRAN a;, it will show salary = 50000 again.
 
 
---------------------------------------------------COMMIT-----------------------------------------------------
+---------------------------- ----------------------2. COMMIT-----------------------------------------------------
+-- COMMIT:-  "Save all the changes made in the current transaction permanently to the database."
 
 begin tran a 
 Update emp  set salary = 90000 where e_id = 23 
@@ -212,7 +251,7 @@ SELECT e_id, salary FROM emp WHERE e_id = 23;
 --✅ Once committed, changes are permanent and cannot be undone using ROLLBACK.
 
 
-----------------------------------------------SAVE----------------------------------------------------
+----------------------------------------------3. SAVE----------------------------------------------------
 --SAVEPOINT is not supported in sql serve , instead it use save
 
 BEGIN Tran a
@@ -243,3 +282,9 @@ ROLLBACK TRANSACTION sp1;  -- Undo changes after sp1 (e_id = 2 update is undone)
 COMMIT TRANSACTION;  -- Finalize the remaining changes
 
 SELECT * FROM emp where e_id in (1,2,3)
+
+
+
+--if to undo everything,use ROLLBACK
+ROLLBACK TRANSACTION;
+
